@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.expo/
+.expo-shared/
+dist/
+
+# Environment
+.env
+.env.local
+
+# Logs
+npm-debug.*
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Testing
+coverage/

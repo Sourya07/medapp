@@ -1,0 +1,47 @@
+{
+    "expo": {
+        "name": "Medical Store",
+        "slug": "medical-store",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "userInterfaceStyle": "light",
+        "splash": {
+            "resizeMode": "contain",
+            "backgroundColor": "#3B82F6"
+        },
+        "assetBundlePatterns": [
+            "**/*"
+        ],
+        "ios": {
+            "supportsTablet": true,
+            "infoPlist": {
+                "NSLocationWhenInUseUsageDescription": "This app needs access to your location to find nearby medical stores.",
+                "NSCameraUsageDescription": "This app needs access to your camera to upload prescription images."
+            }
+        },
+        "android": {
+            "adaptiveIcon": {
+                "backgroundColor": "#3B82F6"
+            },
+            "permissions": [
+                "ACCESS_FINE_LOCATION",
+                "ACCESS_COARSE_LOCATION",
+                "CAMERA"
+            ],
+            "config": {
+                "googleMaps": {
+                    "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+                }
+            },
+            "package": "com.medicalstore.app"
+        },
+        "plugins": [
+            [
+                "expo-location",
+                {
+                    "locationAlwaysAndWhenInUsePermission": "Allow Medical Store to use your location to find nearby stores."
+                }
+            ]
+        ]
+    }
+}
