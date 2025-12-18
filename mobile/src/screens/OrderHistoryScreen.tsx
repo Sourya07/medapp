@@ -8,13 +8,19 @@ import {
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { TabParamList } from '../navigation/TabNavigator';
 import { orderAPI } from '../services/api';
 import { Order, OrderStatus } from '../types';
 
-type NavigationProp = StackNavigationProp<RootStackParamList, 'OrderHistory'>;
+type NavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<TabParamList, 'OrderHistory'>,
+    StackNavigationProp<RootStackParamList>
+>;
 
 const OrderHistoryScreen = () => {
     const navigation = useNavigation<NavigationProp>();
@@ -84,29 +90,29 @@ const OrderHistoryScreen = () => {
 
     if (loading) {
         return (
-            <View style={styles.centerContainer}>
+            <SafeAreaView style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#3B82F6" />
-            </View>
+            </SafeAreaView>
         );
     }
 
     if (orders.length === 0) {
         return (
-            <View style={styles.emptyContainer}>
+            <SafeAreaView style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>📦</Text>
                 <Text style={styles.emptyText}>No orders yet</Text>
                 <TouchableOpacity
                     style={styles.shopButton}
-                    onPress={() => navigation.navigate('MedicineSearch')}
+                    onPress={() => navigation.navigate('MedicineSearch', {})}
                 >
                     <Text style={styles.shopButtonText}>Start Shopping</Text>
                 </TouchableOpacity>
-            </View>
+            </SafeAreaView>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <FlatList
                 data={orders}
                 renderItem={renderOrderCard}
@@ -116,7 +122,7 @@ const OrderHistoryScreen = () => {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             />
-        </View>
+        </SafeAreaView>
     );
 };
 

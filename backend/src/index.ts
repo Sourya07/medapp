@@ -22,10 +22,12 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // Request logging middleware
 app.use((req: Request, _res: Response, next: Function) => {
     console.log(`📥 ${req.method} ${req.url} - IP: ${req.ip}`);
+    console.log(`🔑 Headers: ${JSON.stringify(req.headers.authorization ? 'Present' : 'Missing')}`);
     next();
 });
 

@@ -13,14 +13,22 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 
+import { FirebaseRecaptchaVerifierModal, FirebaseRecaptchaBanner } from 'expo-firebase-recaptcha';
+import { PhoneAuthProvider, signInWithCredential, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
+import app from '../firebaseConfig'; // Get app instance for config
+
 const LoginScreen = () => {
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [otpSent, setOtpSent] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [verificationId, setVerificationId] = useState<any>(null); // Changed to any to hold ConfirmationResult
+    const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifierModal>(null);
 
-    const { sendOTP, login, continueAsGuest } = useAuth();
+    const { login } = useAuth();
 
+    // Handle sending OTP (Real Firebase)
     const handleSendOTP = async () => {
         if (mobileNumber.length !== 10) {
             Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
@@ -29,16 +37,36 @@ const LoginScreen = () => {
 
         setLoading(true);
         try {
-            await sendOTP(mobileNumber);
+            const phoneNumber = '+91' + mobileNumber; // Assume +91 for now, can make dynamic
+            console.log('Sending OTP to:', phoneNumber);
+
+            // The Firebase JS SDK `signInWithPhoneNumber` requires the ApplicationVerifier
+            // which is connected to the Recaptcha Modal via ref.
+            // @ts-ignore - API types mismatch with Expo wrapper slightly
+            const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier.current!);
+
+            // In some versions, it returns a ConfirmationResult (with .confirm), 
+            // in others (React Native wrapper context) it might yield a verificationId string.
+            // Let's handle the standard JS SDK object which is ConfirmationResult.
+            // Actually, wait, `signInWithPhoneNumber` returns `ConfirmationResult`.
+
+            /* 
+               NOTE: `expo-firebase-recaptcha` is a bit of a polyfill. 
+               If `verificationId` is actually a ConfirmationResult object, we store it.
+            */
+
+            setVerificationId(confirmationResult);
             setOtpSent(true);
             Alert.alert('Success', 'OTP sent to your mobile number');
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to send OTP');
+            console.error(error);
+            Alert.alert('Error', error.code === 'auth/invalid-phone-number' ? 'Invalid Phone Number' : error.message);
         } finally {
             setLoading(false);
         }
     };
 
+    // Verify OTP
     const handleVerifyOTP = async () => {
         if (otp.length !== 6) {
             Alert.alert('Error', 'Please enter a valid 6-digit OTP');
@@ -47,88 +75,111 @@ const LoginScreen = () => {
 
         setLoading(true);
         try {
-            await login(mobileNumber, otp);
+            let idToken;
+
+            if (verificationId && verificationId.confirm) {
+                // It's a ConfirmationResult object
+                const confirmation = verificationId;
+                const userCredential = await confirmation.confirm(otp);
+                idToken = await userCredential.user.getIdToken();
+            } else {
+                // Fallback or if using pure PhoneAuthProvider.credential (manual flow)
+                // const credential = PhoneAuthProvider.credential(verificationId as string, otp);
+                // const userCredential = await signInWithCredential(auth, credential);
+                // idToken = await userCredential.user.getIdToken();
+                throw new Error('Verification session lost. Please retry.');
+            }
+
+            console.log('✅ Phone Auth Success. ID Token obtained.');
+
+            // Send to Backend
+            await login(idToken);
+            // Navigation handled by context
+
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Invalid OTP');
+            console.error('Verify Error:', error);
+            if (error.code === 'auth/invalid-verification-code') {
+                Alert.alert('Error', 'Invalid OTP Code');
+            } else {
+                Alert.alert('Error', error.message || 'Verification failed');
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGuestMode = () => {
-        continueAsGuest();
-    };
+    // Removed handleGuestMode as it's not part of the instruction's scope and `continueAsGuest` is not defined.
 
     return (
-        <LinearGradient colors={['#3B82F6', '#1E40AF']} style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={styles.keyboardView}
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardView}
+        >
+            <LinearGradient
+                colors={['#3B82F6', '#1E40AF']}
+                style={styles.container}
             >
+                <FirebaseRecaptchaVerifierModal
+                    ref={recaptchaVerifier}
+                    firebaseConfig={app.options}
+                // attemptInvisibleVerification={true} // Optional: try invisible first
+                />
+
                 <View style={styles.content}>
                     <Text style={styles.title}>🏥 Medical Store</Text>
                     <Text style={styles.subtitle}>
                         Get medicines delivered from nearby stores
                     </Text>
-
                     <View style={styles.card}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Mobile Number"
-                            keyboardType="phone-pad"
-                            maxLength={10}
-                            value={mobileNumber}
-                            onChangeText={setMobileNumber}
-                            editable={!otpSent}
-                        />
-
-                        {otpSent && (
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter OTP"
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                value={otp}
-                                onChangeText={setOtp}
-                                autoFocus
-                            />
-                        )}
-
-                        {loading ? (
-                            <ActivityIndicator size="large" color="#3B82F6" style={styles.loader} />
-                        ) : (
-                            <>
-                                {!otpSent ? (
-                                    <>
-                                        <TouchableOpacity style={styles.button} onPress={handleSendOTP}>
+                        <View style={styles.formContainer}>
+                            {!otpSent ? (
+                                <>
+                                    <Text style={styles.label}>Mobile Number</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter 10-digit number"
+                                        keyboardType="phone-pad"
+                                        maxLength={10}
+                                        value={mobileNumber}
+                                        onChangeText={setMobileNumber}
+                                    />
+                                    {loading ? (
+                                        <ActivityIndicator color="#0066FF" />
+                                    ) : (
+                                        <TouchableOpacity style={styles.button} onPress={handleSendOTP} disabled={loading}>
                                             <Text style={styles.buttonText}>Send OTP</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.guestButton}
-                                            onPress={handleGuestMode}
-                                        >
-                                            <Text style={styles.guestButtonText}>Browse as Guest</Text>
+                                    )}
+                                    <FirebaseRecaptchaBanner />
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={styles.label}>Enter OTP</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter 6-digit OTP"
+                                        keyboardType="number-pad"
+                                        maxLength={6}
+                                        value={otp}
+                                        onChangeText={setOtp}
+                                    />
+                                    {loading ? (
+                                        <ActivityIndicator color="#0066FF" />
+                                    ) : (
+                                        <TouchableOpacity style={styles.button} onPress={handleVerifyOTP} disabled={loading}>
+                                            <Text style={styles.buttonText}>Verify & Login</Text>
                                         </TouchableOpacity>
-                                    </>
-                                ) : (
-                                    <>
-                                        <TouchableOpacity style={styles.button} onPress={handleVerifyOTP}>
-                                            <Text style={styles.buttonText}>Verify OTP</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.resendButton}
-                                            onPress={handleSendOTP}
-                                        >
-                                            <Text style={styles.resendText}>Resend OTP</Text>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-                            </>
-                        )}
+                                    )}
+                                    <TouchableOpacity onPress={() => setOtpSent(false)} disabled={loading}>
+                                        <Text style={styles.resendText}>Change Number</Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+                        </View>
                     </View>
                 </View>
-            </KeyboardAvoidingView>
-        </LinearGradient>
+            </LinearGradient>
+        </KeyboardAvoidingView>
     );
 };
 

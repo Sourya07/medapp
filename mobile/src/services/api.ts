@@ -68,24 +68,17 @@ api.interceptors.response.use(
 
 // API functions
 export const authAPI = {
+    // Deprecated: sendOTP is now handled by Firebase Client SDK
     sendOTP: (mobileNumber: string) => {
-        console.log('📤 Sending OTP request to:', `${API_URL}/auth/send-otp`);
-        console.log('📱 Mobile number:', mobileNumber);
-        return api.post('/auth/send-otp', { mobileNumber })
-            .then(response => {
-                console.log('✅ OTP request successful:', response.data);
-                return response;
-            })
-            .catch(error => {
-                console.error('❌ OTP request failed:', error.message);
-                console.error('Error details:', error.response?.data || error);
-                throw error;
-            });
+        // Just return a resolved promise as placeholder if needed
+        return Promise.resolve({ data: { success: true } });
     },
 
-    verifyOTP: (mobileNumber: string, otp: string) =>
-        api.post('/auth/verify-otp', { mobileNumber, otp }),
+    // Verify Firebase ID Token to get Backend Session JWT
+    verifyFirebaseToken: (idToken: string, mobileNumber?: string) =>
+        api.post('/auth/verify-firebase-token', { idToken, mobileNumber }),
 
+    // updateLocation remains unchanged
     updateLocation: (latitude: number, longitude: number) =>
         api.post('/auth/update-location', { latitude, longitude }),
 };
@@ -99,8 +92,8 @@ export const storeAPI = {
 };
 
 export const medicineAPI = {
-    search: (query: string, latitude?: number, longitude?: number, nearbyOnly?: boolean) => {
-        const params: any = { query };
+    search: (query: string, latitude?: number, longitude?: number, nearbyOnly?: boolean, limit: number = 10, page: number = 1) => {
+        const params: any = { query, limit, page };
         if (latitude) params.latitude = latitude;
         if (longitude) params.longitude = longitude;
         if (nearbyOnly !== undefined) params.nearbyOnly = nearbyOnly;
@@ -119,8 +112,8 @@ export const categoryAPI = {
 };
 
 export const orderAPI = {
-    createOrder: (storeId: string, items: any[], notes?: string) =>
-        api.post('/orders', { storeId, items, notes }),
+    createOrder: (storeId: string, items: any[], address: any, notes?: string) =>
+        api.post('/orders', { storeId, items, deliveryAddress: address, notes }),
 
     getOrderById: (id: string) =>
         api.get(`/orders/${id}`),

@@ -7,26 +7,49 @@ import {
     TouchableOpacity,
     Alert,
     ActivityIndicator,
+    TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { TabParamList } from '../navigation/TabNavigator';
 import { useAuth } from '../context/AuthContext';
 import { addressAPI } from '../services/addressAPI';
 import { Address } from '../types';
 
-type NavigationProp = StackNavigationProp<RootStackParamList, 'Profile'>;
+type NavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<TabParamList, 'Profile'>,
+    StackNavigationProp<RootStackParamList>
+>;
+
+import { FirebaseRecaptchaVerifierModal, FirebaseRecaptchaBanner } from 'expo-firebase-recaptcha';
+import { PhoneAuthProvider, signInWithCredential, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
+import app from '../firebaseConfig'; // Get app instance for config
 
 const ProfileScreen = () => {
     const navigation = useNavigation<NavigationProp>();
-    const { user, logout } = useAuth();
+    const { user, logout, login, isGuestMode } = useAuth();
     const [addresses, setAddresses] = useState<Address[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Login State
+    const [mobileNumber, setMobileNumber] = useState('');
+    const [otp, setOtp] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
+    const [authLoading, setAuthLoading] = useState(false);
+    const [verificationId, setVerificationId] = useState<any>(null);
+    const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifierModal>(null);
+
     useEffect(() => {
-        fetchAddresses();
-    }, []);
+        if (user) {
+            fetchAddresses();
+        } else {
+            setLoading(false);
+        }
+    }, [user]);
 
     const fetchAddresses = async () => {
         try {
@@ -36,6 +59,60 @@ const ProfileScreen = () => {
             console.error('Failed to fetch addresses:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Auth Handlers (Updated for Firebase)
+    const handleSendOTP = async () => {
+        if (mobileNumber.length !== 10) {
+            Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
+            return;
+        }
+
+        setAuthLoading(true);
+        try {
+            const phoneNumber = '+91' + mobileNumber;
+            const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier.current!);
+            setVerificationId(confirmationResult);
+            setOtpSent(true);
+            Alert.alert('Success', 'OTP sent to your mobile number');
+        } catch (error: any) {
+            console.error(error);
+            Alert.alert('Error', error.code === 'auth/invalid-phone-number' ? 'Invalid Phone Number' : error.message);
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
+    const handleVerifyOTP = async () => {
+        if (otp.length !== 6) {
+            Alert.alert('Error', 'Please enter valid 6-digit OTP');
+            return;
+        }
+
+        setAuthLoading(true);
+        try {
+            let idToken;
+
+            if (verificationId && verificationId.confirm) {
+                const confirmation = verificationId;
+                const userCredential = await confirmation.confirm(otp);
+                idToken = await userCredential.user.getIdToken();
+            } else {
+                throw new Error('Verification session lost. Please retry.');
+            }
+
+            // Send to Backend
+            await login(idToken);
+            // On success, user state updates automatically
+        } catch (error: any) {
+            if (error.code === 'auth/invalid-verification-code') {
+                Alert.alert('Error', 'Invalid OTP Code');
+            } else {
+                Alert.alert('Error', error.message || 'Verification failed');
+            }
+        } finally {
+            setAuthLoading(false);
         }
     };
 
@@ -85,6 +162,72 @@ const ProfileScreen = () => {
             Alert.alert('Error', 'Failed to set default address');
         }
     };
+
+    if (!user) {
+        return (
+            <View style={guestStyles.container}>
+                <FirebaseRecaptchaVerifierModal
+                    ref={recaptchaVerifier}
+                    firebaseConfig={app.options}
+                />
+                <View style={guestStyles.content}>
+                    <Ionicons name="person-circle-outline" size={80} color="#0066FF" />
+                    <Text style={guestStyles.title}>Login to Profile</Text>
+                    <Text style={guestStyles.subtitle}>
+                        Manage your addresses and orders
+                    </Text>
+
+                    <View style={guestStyles.form}>
+                        {/* Login Form */}
+                        {!otpSent ? (
+                            <>
+                                <TextInput
+                                    style={guestStyles.input}
+                                    placeholder="Mobile Number"
+                                    keyboardType="phone-pad"
+                                    maxLength={10}
+                                    value={mobileNumber}
+                                    onChangeText={setMobileNumber}
+                                />
+                                <TouchableOpacity style={guestStyles.button} onPress={handleSendOTP}>
+                                    {authLoading ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <Text style={guestStyles.buttonText}>Send OTP</Text>
+                                    )}
+                                </TouchableOpacity>
+                                <FirebaseRecaptchaBanner />
+                            </>
+                        ) : (
+                            <>
+                                <TextInput
+                                    style={guestStyles.input}
+                                    placeholder="Enter OTP / Code"
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                    value={otp}
+                                    onChangeText={setOtp}
+                                />
+                                <TouchableOpacity style={guestStyles.button} onPress={handleVerifyOTP}>
+                                    {authLoading ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <Text style={guestStyles.buttonText}>Verify & Login</Text>
+                                    )}
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={guestStyles.resendButton}
+                                    onPress={() => setOtpSent(false)}
+                                >
+                                    <Text style={guestStyles.resendText}>Change Number</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <ScrollView style={styles.container}>
@@ -341,6 +484,74 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FF6B6B',
+    },
+});
+
+const guestStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    content: {
+        backgroundColor: '#FFF',
+        borderRadius: 24,
+        padding: 32,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    subtitle: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginBottom: 32,
+    },
+    form: {
+        width: '100%',
+    },
+    input: {
+        width: '100%',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        padding: 16,
+        fontSize: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    button: {
+        width: '100%',
+        backgroundColor: '#0066FF',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    buttonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    resendButton: {
+        marginTop: 12,
+        alignItems: 'center',
+    },
+    resendText: {
+        color: '#0066FF',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

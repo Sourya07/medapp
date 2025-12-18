@@ -3,16 +3,27 @@ import Order, { OrderStatus } from '../models/Order';
 import Medicine from '../models/Medicine';
 import { AuthRequest } from '../middleware/auth';
 
+import { DEFAULT_STORE_ID } from '../config/constants';
+
 // Create new order
 export const createOrder = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { storeId, items, notes } = req.body;
+        const { storeId = DEFAULT_STORE_ID, items, notes, deliveryAddress } = req.body;
 
         // Validate items
         if (!items || !Array.isArray(items) || items.length === 0) {
             res.status(400).json({
                 success: false,
                 message: 'Order must have at least one item'
+            });
+            return;
+        }
+
+        // Validate address
+        if (!deliveryAddress) {
+            res.status(400).json({
+                success: false,
+                message: 'Delivery address is required'
             });
             return;
         }
@@ -61,6 +72,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
             store: storeId,
             items: orderItems,
             totalPrice,
+            deliveryAddress,
             notes
         });
 
@@ -199,6 +211,34 @@ export const getOrdersByStore = async (req: Request, res: Response): Promise<voi
         });
     } catch (error) {
         console.error('Error fetching store orders:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+};
+// Get all orders (admin only)
+export const getAllOrders = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { status } = req.query;
+
+        const filter: any = {};
+        if (status && status !== 'All') {
+            filter.status = status;
+        }
+
+        const orders = await Order.find(filter)
+            .populate('user', 'mobileNumber')
+            .populate('store', 'name address')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: orders.length,
+            data: orders
+        });
+    } catch (error) {
+        console.error('Error fetching all orders:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error'

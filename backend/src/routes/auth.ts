@@ -1,7 +1,7 @@
 import express from 'express';
 import {
     sendOTPController,
-    verifyOTPController,
+    verifyFirebaseTokenController,
     refreshTokenController,
     updateLocationController
 } from '../controllers/authController';
@@ -10,8 +10,10 @@ import { authenticateUser } from '../middleware/auth';
 const router = express.Router();
 
 // Public routes
-router.post('/send-otp', sendOTPController);
-router.post('/verify-otp', verifyOTPController);
+router.post('/send-otp', sendOTPController); // Deprecated but kept for compatibility
+router.post('/verify-firebase-token', verifyFirebaseTokenController);
+// router.post('/verify-otp', verifyOTPController); // Deprecated
+// router.post('/flash-call', initiateFlashCallController); // Removed
 router.post('/refresh-token', refreshTokenController);
 
 // Protected routes

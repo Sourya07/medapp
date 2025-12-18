@@ -10,15 +10,21 @@ import {
     Image,
     Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { TabParamList } from '../navigation/TabNavigator';
 import { useLocation } from '../context/LocationContext';
 import { useCart } from '../context/CartContext';
 import { medicineAPI } from '../services/api';
 import { Medicine } from '../types';
 
-type NavigationProp = StackNavigationProp<RootStackParamList, 'MedicineSearch'>;
+type NavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<TabParamList, 'MedicineSearch'>,
+    StackNavigationProp<RootStackParamList>
+>;
 
 const MedicineSearchScreen = () => {
     const navigation = useNavigation<NavigationProp>();
@@ -120,7 +126,7 @@ const MedicineSearchScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <View style={styles.searchSection}>
                 <TextInput
                     style={styles.searchInput}
@@ -159,7 +165,7 @@ const MedicineSearchScreen = () => {
                     contentContainerStyle={styles.list}
                 />
             )}
-        </View>
+        </SafeAreaView>
     );
 };
 

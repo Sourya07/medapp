@@ -7,15 +7,10 @@ import { uploadToCloudinary } from '../utils/upload';
 // Search medicines by name
 export const searchMedicines = async (req: AuthRequest | any, res: Response): Promise<void> => {
     try {
-        const { query, latitude, longitude, nearbyOnly } = req.query;
-
-        if (!query) {
-            res.status(400).json({
-                success: false,
-                message: 'Search query is required'
-            });
-            return;
-        }
+        const { query, latitude, longitude, nearbyOnly, limit = 10, page = 1 } = req.query;
+        const limitNum = parseInt(limit as string);
+        const pageNum = parseInt(page as string);
+        const skip = (pageNum - 1) * limitNum;
 
         let medicines;
 
@@ -42,24 +37,36 @@ export const searchMedicines = async (req: AuthRequest | any, res: Response): Pr
 
             const storeIds = nearbyStores.map(store => store._id);
 
-            // Search medicines in nearby stores using regex for partial matching
-            medicines = await Medicine.find({
-                name: { $regex: query as string, $options: 'i' }, // Case-insensitive partial match
+            const searchCriteria: any = {
                 store: { $in: storeIds },
                 isActive: true,
                 quantity: { $gt: 0 }
-            })
+            };
+
+            if (query) {
+                searchCriteria.name = { $regex: query as string, $options: 'i' };
+            }
+
+            // Search medicines in nearby stores
+            medicines = await Medicine.find(searchCriteria)
                 .populate('store', 'name address location contactNumber')
-                .limit(50);
+                .skip(skip)
+                .limit(limitNum);
         } else {
-            // Search all medicines using regex for partial matching
-            medicines = await Medicine.find({
-                name: { $regex: query as string, $options: 'i' }, // Case-insensitive partial match
+            const searchCriteria: any = {
                 isActive: true,
                 quantity: { $gt: 0 }
-            })
+            };
+
+            if (query) {
+                searchCriteria.name = { $regex: query as string, $options: 'i' };
+            }
+
+            // Search all medicines
+            medicines = await Medicine.find(searchCriteria)
                 .populate('store', 'name address location contactNumber')
-                .limit(50);
+                .skip(skip)
+                .limit(limitNum);
         }
 
         res.status(200).json({
@@ -128,13 +135,19 @@ export const getMedicinesByStore = async (req: Request, res: Response): Promise<
     }
 };
 
+import { DEFAULT_STORE_ID } from '../config/constants';
+
 // Create medicine (admin only)
 export const createMedicine = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { name, description, price, quantity, prescriptionRequired, store, category, manufacturer } = req.body;
+        const {
+            name, description, price, quantity, prescriptionRequired,
+            store = DEFAULT_STORE_ID, category, subcategory, manufacturer,
+            dosage, discount, imageUrl, isActive
+        } = req.body;
 
         // Validate required fields
-        if (!name || !description || !price || !store) {
+        if (!name || !description || !price) {
             res.status(400).json({
                 success: false,
                 message: 'Missing required fields'
@@ -150,7 +163,12 @@ export const createMedicine = async (req: Request, res: Response): Promise<void>
             prescriptionRequired: prescriptionRequired || false,
             store,
             category,
-            manufacturer
+            subcategory,
+            manufacturer,
+            dosage,
+            discount: discount || 0,
+            imageUrl,
+            isActive: isActive !== undefined ? isActive : true
         });
 
         res.status(201).json({

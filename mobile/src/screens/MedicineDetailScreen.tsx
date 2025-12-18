@@ -35,7 +35,7 @@ const MedicineDetailScreen = () => {
 
     const fetchMedicineDetails = async () => {
         try {
-            const response = await medicineAPI.getMedicineById(medicineId);
+            const response = await medicineAPI.getById(medicineId);
             setMedicine(response.data.data);
         } catch (error) {
             Alert.alert('Error', 'Failed to load medicine details');

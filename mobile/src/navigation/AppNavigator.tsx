@@ -13,19 +13,22 @@ import CheckoutScreen from '../screens/CheckoutScreen';
 import OrderHistoryScreen from '../screens/OrderHistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AddAddressScreen from '../screens/AddAddressScreen';
-import { OrderDetailScreen, MapScreen } from '../screens/PlaceholderScreens';
+import { MapScreen } from '../screens/PlaceholderScreens';
+import OrderDetailScreen from '../screens/OrderDetailScreen';
+import TabNavigator, { TabParamList } from './TabNavigator';
+import { NavigatorScreenParams } from '@react-navigation/native';
+
+import OrderSuccessScreen from '../screens/OrderSuccessScreen';
 
 export type RootStackParamList = {
     Login: undefined;
-    Home: undefined;
-    MedicineSearch: { category?: string };
+    Main: NavigatorScreenParams<TabParamList>;
     MedicineDetail: { medicineId: string };
-    Cart: undefined;
+    Cart: undefined; // Keeping these for compatibility if directly accessed via Navigate, but theoretically should use Main
     Checkout: undefined;
-    OrderHistory: undefined;
     OrderDetail: { orderId: string };
+    OrderSuccess: undefined;
     Map: { storeId: string };
-    Profile: undefined;
     AddAddress: { mode: 'add' | 'edit'; address?: any };
 };
 
@@ -49,14 +52,9 @@ const AppNavigator = () => {
             >
                 {/* Everyone lands on Home - no login gate */}
                 <Stack.Screen
-                    name="Home"
-                    component={HomeScreen}
+                    name="Main"
+                    component={TabNavigator}
                     options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="MedicineSearch"
-                    component={MedicineSearchScreen}
-                    options={{ title: 'Search Medicines' }}
                 />
                 <Stack.Screen
                     name="MedicineDetail"
@@ -64,34 +62,20 @@ const AppNavigator = () => {
                     options={{ title: 'Medicine Details' }}
                 />
                 <Stack.Screen
-                    name="Cart"
-                    component={CartScreen}
-                    options={{ title: 'My Cart' }}
-                />
-                <Stack.Screen
                     name="Checkout"
                     component={CheckoutScreen}
                     options={{ title: 'Checkout' }}
-                />
-                <Stack.Screen
-                    name="OrderHistory"
-                    component={OrderHistoryScreen}
-                    options={{ title: 'Order History' }}
                 />
                 <Stack.Screen
                     name="OrderDetail"
                     component={OrderDetailScreen}
                     options={{ title: 'Order Details' }}
                 />
+                <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} options={{ headerShown: false, gestureEnabled: false }} />
                 <Stack.Screen
                     name="Map"
                     component={MapScreen}
                     options={{ title: 'Store Location' }}
-                />
-                <Stack.Screen
-                    name="Profile"
-                    component={ProfileScreen}
-                    options={{ title: 'My Profile' }}
                 />
                 <Stack.Screen
                     name="AddAddress"

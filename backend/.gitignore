@@ -34,3 +34,6 @@ coverage/
 
 # Uploads
 uploads/
+
+# Security
+service-account.json

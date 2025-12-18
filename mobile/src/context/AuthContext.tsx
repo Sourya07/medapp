@@ -11,10 +11,11 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     isGuestMode: boolean;
-    login: (mobileNumber: string, otp: string) => Promise<void>;
+    login: (idToken: string, mobileNumber?: string) => Promise<void>;
     logout: () => Promise<void>;
-    sendOTP: (mobileNumber: string) => Promise<void>;
-    verifyPhoneForCheckout: (mobileNumber: string, otp: string) => Promise<void>;
+    sendOTP: (mobileNumber: string) => Promise<void>; // Deprecated
+    initiateFlashCall: (mobileNumber: string) => Promise<void>; // Deprecated
+    verifyPhoneForCheckout: (mobileNumber: string, otp: string) => Promise<void>; // Deprecated/Todo
     continueAsGuest: () => void;
 }
 
@@ -63,27 +64,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
     };
 
+    // sendOTP and initiateFlashCall are removed as they are client-side in Firebase
     const sendOTP = async (mobileNumber: string) => {
-        try {
-            await authAPI.sendOTP(mobileNumber);
-        } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to send OTP');
-        }
+        console.warn('sendOTP in AuthContext is deprecated. Use Firebase SDK.');
     };
 
-    const login = async (mobileNumber: string, otp: string) => {
+    const initiateFlashCall = async (mobileNumber: string) => {
+        console.warn('initiateFlashCall is deprecated.');
+    };
+
+    // Updated login to verify ID Token (with optional mobile for bypass)
+    const login = async (idToken: string, mobileNumber?: string) => {
         try {
-            const response = await authAPI.verifyOTP(mobileNumber, otp);
+            const response = await authAPI.verifyFirebaseToken(idToken, mobileNumber);
             const { user: userData, accessToken, refreshToken } = response.data.data;
 
             // Store tokens and user data
             await SecureStore.setItemAsync('accessToken', accessToken);
             await SecureStore.setItemAsync('refreshToken', refreshToken);
+            // ... (rest of storage logic remains same) ...
             await SecureStore.setItemAsync('user', JSON.stringify(userData));
             await SecureStore.deleteItemAsync('guestMode');
 
             setUser(userData);
-            setPhoneNumber(mobileNumber);
+            // setPhoneNumber? We can get it from user data or token. 
+            // For now, let's assume userData has it.
+            setPhoneNumber(userData.mobileNumber);
             setIsPhoneVerified(true);
             setIsGuestMode(false);
         } catch (error: any) {
@@ -91,24 +97,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // Deprecated/Modified
     const verifyPhoneForCheckout = async (mobileNumber: string, otp: string) => {
-        try {
-            const response = await authAPI.verifyOTP(mobileNumber, otp);
-            const { user: userData, accessToken, refreshToken } = response.data.data;
-
-            // Store minimal data for guest checkout
-            await SecureStore.setItemAsync('accessToken', accessToken);
-            await SecureStore.setItemAsync('refreshToken', refreshToken);
-            await SecureStore.setItemAsync('phoneNumber', mobileNumber);
-            await SecureStore.setItemAsync('phoneVerified', 'true');
-            await SecureStore.setItemAsync('user', JSON.stringify(userData));
-
-            setPhoneNumber(mobileNumber);
-            setIsPhoneVerified(true);
-            setUser(userData);
-        } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Verification failed');
-        }
+        console.warn('verifyPhoneForCheckout needs implementation for Firebase');
     };
 
     const logout = async () => {
@@ -147,6 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 login,
                 logout,
                 sendOTP,
+                initiateFlashCall,
                 verifyPhoneForCheckout,
                 continueAsGuest,
             }}

@@ -14,9 +14,13 @@ export const authenticateAdmin = async (
 ): Promise<void> => {
     try {
         // Get token from header
-        const token = req.header('Authorization')?.replace('Bearer ', '');
+        const authHeader = req.header('Authorization');
+        console.log('[AuthDebug] Auth Header:', authHeader);
+
+        const token = authHeader?.replace('Bearer ', '');
 
         if (!token) {
+            console.log('[AuthDebug] No token provided');
             res.status(401).json({
                 success: false,
                 message: 'No authentication token provided'
@@ -25,28 +29,42 @@ export const authenticateAdmin = async (
         }
 
         // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { adminId: string };
+        const jwtSecret = process.env.JWT_SECRET || 'default-secret';
+        console.log('[AuthDebug] Using Secret:', jwtSecret === 'default-secret' ? 'default-secret' : '***ENV_VAR***');
 
-        // Find admin
-        const admin = await Admin.findById(decoded.adminId);
+        try {
+            const decoded = jwt.verify(token, jwtSecret) as { adminId: string };
+            console.log('[AuthDebug] Decoded Token:', decoded);
 
-        if (!admin) {
+            // Find admin
+            const admin = await Admin.findById(decoded.adminId);
+            console.log('[AuthDebug] Admin Found:', admin ? admin.email : 'NOT FOUND');
+
+            if (!admin) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Admin not found'
+                });
+                return;
+            }
+
+            // Attach admin to request
+            req.adminId = decoded.adminId;
+            req.admin = admin;
+
+            next();
+        } catch (error) {
+            console.log('[AuthDebug] Token Verification Failed:', error);
             res.status(401).json({
                 success: false,
-                message: 'Admin not found'
+                message: 'Invalid or expired token'
             });
-            return;
         }
-
-        // Attach admin to request
-        req.adminId = decoded.adminId;
-        req.admin = admin;
-
-        next();
     } catch (error) {
+        console.error('[AuthDebug] Unexpected Error:', error);
         res.status(401).json({
             success: false,
-            message: 'Invalid or expired token'
+            message: 'Authentication failed'
         });
     }
 };

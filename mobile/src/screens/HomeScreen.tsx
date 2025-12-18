@@ -9,21 +9,28 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { TabParamList } from '../navigation/TabNavigator';
 import { useLocation } from '../context/LocationContext';
 import { useCart } from '../context/CartContext';
 import { medicineAPI } from '../services/api';
 import { Medicine } from '../types';
 
-type NavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
+type HomeScreenNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<TabParamList, 'Home'>,
+    StackNavigationProp<RootStackParamList>
+>;
 
 const HomeScreen = () => {
-    const navigation = useNavigation<NavigationProp>();
+    const navigation = useNavigation<HomeScreenNavigationProp>();
     const { location, locationName, isLoading: locationLoading } = useLocation();
     const { getTotalItems, addToCart } = useCart();
     const [featuredMedicines, setFeaturedMedicines] = useState<Medicine[]>([]);
+    const [pharmacyMedicines, setPharmacyMedicines] = useState<Medicine[]>([]);
+    const [petCareMedicines, setPetCareMedicines] = useState<Medicine[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -32,13 +39,21 @@ const HomeScreen = () => {
 
     const fetchFeaturedMedicines = async () => {
         try {
-            const response = await medicineAPI.search(
-                'health',
-                location?.latitude,
-                location?.longitude,
-                false
-            );
-            setFeaturedMedicines(response.data.data?.slice(0, 6) || []);
+            const [featuredRes, pharmacyRes, petCareRes] = await Promise.all([
+                medicineAPI.search(
+                    'health',
+                    location?.latitude,
+                    location?.longitude,
+                    false
+                ),
+                medicineAPI.getByCategory('Pharmacy'),
+                medicineAPI.getByCategory('Pet Care')
+            ]);
+
+            setFeaturedMedicines(featuredRes.data.data?.slice(0, 6) || []);
+            setPharmacyMedicines(pharmacyRes.data.data || []);
+            setPetCareMedicines(petCareRes.data.data || []);
+
         } catch (error) {
             console.error('Failed to fetch medicines:', error);
         } finally {
@@ -250,8 +265,11 @@ const HomeScreen = () => {
                                         <Ionicons name="medkit" size={48} color="#9CA3AF" />
                                     </View>
                                 )}
-                                <Text style={styles.productName} numberOfLines={2}>
+                                <Text style={styles.productName} numberOfLines={1}>
                                     {medicine.name}
+                                </Text>
+                                <Text style={styles.productDescription} numberOfLines={2}>
+                                    {medicine.description}
                                 </Text>
                                 <View style={styles.productFooter}>
                                     <Text style={styles.productPrice}>₹{medicine.price.toFixed(2)}</Text>
@@ -273,43 +291,108 @@ const HomeScreen = () => {
                     </View>
                 )}
 
+                {/* Pharmacy Section */}
+                {pharmacyMedicines.length > 0 && (
+                    <View>
+                        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                            <Text style={styles.sectionTitle}>Pharmacy</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('MedicineSearch', { category: 'Pharmacy' })}>
+                                <Text style={styles.viewAllText}>View All</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.productsScroll}
+                        >
+                            {pharmacyMedicines.map((medicine, index) => (
+                                <TouchableOpacity
+                                    key={medicine._id}
+                                    style={styles.productCard}
+                                    onPress={() => navigation.navigate('MedicineDetail', { medicineId: medicine._id })}
+                                >
+                                    {medicine.imageUrl ? (
+                                        <Image source={{ uri: medicine.imageUrl }} style={styles.productImage} />
+                                    ) : (
+                                        <View style={[styles.productImage, styles.placeholderImage]}>
+                                            <Ionicons name="medkit" size={48} color="#9CA3AF" />
+                                        </View>
+                                    )}
+                                    <Text style={styles.productName} numberOfLines={1}>
+                                        {medicine.name}
+                                    </Text>
+                                    <Text style={styles.productDescription} numberOfLines={2}>
+                                        {medicine.description}
+                                    </Text>
+                                    <View style={styles.productFooter}>
+                                        <Text style={styles.productPrice}>₹{medicine.price.toFixed(2)}</Text>
+                                        <TouchableOpacity
+                                            style={styles.addProductButton}
+                                            onPress={() => handleAddToCart(medicine)}
+                                        >
+                                            <Ionicons name="add" size={20} color="#FFF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {/* Pet Care Section */}
+                {petCareMedicines.length > 0 && (
+                    <View>
+                        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                            <Text style={styles.sectionTitle}>Pet Care</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('MedicineSearch', { category: 'Pet Care' })}>
+                                <Text style={styles.viewAllText}>View All</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.productsScroll}
+                        >
+                            {petCareMedicines.map((medicine, index) => (
+                                <TouchableOpacity
+                                    key={medicine._id}
+                                    style={styles.productCard}
+                                    onPress={() => navigation.navigate('MedicineDetail', { medicineId: medicine._id })}
+                                >
+                                    <View style={[styles.discountBadge, { backgroundColor: '#FF9500' }]}>
+                                        <Text style={styles.discountText}>PETS</Text>
+                                    </View>
+                                    {medicine.imageUrl ? (
+                                        <Image source={{ uri: medicine.imageUrl }} style={styles.productImage} />
+                                    ) : (
+                                        <View style={[styles.productImage, styles.placeholderImage]}>
+                                            <Ionicons name="paw" size={48} color="#9CA3AF" />
+                                        </View>
+                                    )}
+                                    <Text style={styles.productName} numberOfLines={1}>
+                                        {medicine.name}
+                                    </Text>
+                                    <Text style={styles.productDescription} numberOfLines={2}>
+                                        {medicine.description}
+                                    </Text>
+                                    <View style={styles.productFooter}>
+                                        <Text style={styles.productPrice}>₹{medicine.price.toFixed(2)}</Text>
+                                        <TouchableOpacity
+                                            style={styles.addProductButton}
+                                            onPress={() => handleAddToCart(medicine)}
+                                        >
+                                            <Ionicons name="add" size={20} color="#FFF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
                 {/* Bottom Spacing */}
                 <View style={{ height: 100 }} />
             </ScrollView>
-
-            {/* Bottom Navigation */}
-            <View style={styles.bottomNav}>
-                <TouchableOpacity style={styles.navItem} onPress={() => { }}>
-                    <Ionicons name="home" size={24} color="#00B4D8" />
-                    <Text style={styles.navLabelActive}>Home</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
-                    <Ionicons name="notifications-outline" size={24} color="#9CA3AF" />
-                    <Text style={styles.navLabel}>Notification</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.navItemCenter}
-                    onPress={() => navigation.navigate('MedicineSearch', {})}
-                >
-                    <View style={styles.centerButton}>
-                        <Ionicons name="medical-outline" size={28} color="#FFF" />
-                    </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.navItem}
-                    onPress={() => navigation.navigate('OrderHistory')}
-                >
-                    <Ionicons name="document-text-outline" size={24} color="#9CA3AF" />
-                    <Text style={styles.navLabel}>History</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.navItem}
-                    onPress={() => navigation.navigate('Profile' as any)}
-                >
-                    <Ionicons name="person-outline" size={24} color="#9CA3AF" />
-                    <Text style={styles.navLabel}>Profile</Text>
-                </TouchableOpacity>
-            </View>
         </View>
     );
 };
@@ -578,8 +661,13 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#1F2937',
+        marginBottom: 4,
+    },
+    productDescription: {
+        fontSize: 10,
+        color: '#6B7280',
         marginBottom: 8,
-        height: 36,
+        height: 28,
     },
     productFooter: {
         flexDirection: 'row',

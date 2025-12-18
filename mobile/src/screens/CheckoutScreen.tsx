@@ -19,6 +19,7 @@ import { orderAPI } from '../services/api';
 import { addressAPI } from '../services/addressAPI';
 import { Address } from '../types';
 import PhoneVerificationModal from '../components/PhoneVerificationModal';
+import { DEFAULT_STORE_ID } from '../config/constants';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Checkout'>;
 
@@ -83,10 +84,10 @@ const CheckoutScreen = () => {
 
         setLoading(true);
         try {
-            // Get store ID from first item
-            const storeId = typeof cart[0].medicine.store === 'object'
+            // Get store ID from first item or use default
+            const storeId = (typeof cart[0].medicine.store === 'object'
                 ? cart[0].medicine.store._id
-                : cart[0].medicine.store;
+                : cart[0].medicine.store) || DEFAULT_STORE_ID;
 
             // Validate store ID exists
             if (!storeId) {
@@ -101,27 +102,17 @@ const CheckoutScreen = () => {
                 quantity: item.quantity,
             }));
 
-            const response = await orderAPI.createOrder(storeId, items, notes);
+            const response = await orderAPI.createOrder(storeId, items, selectedAddress, notes);
+
+            // Artificial delay to show the nice animation if it's too fast
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             clearCart();
-            Alert.alert(
-                'Success',
-                'Order placed successfully!',
-                [
-                    {
-                        text: 'View Order',
-                        onPress: () => navigation.navigate('OrderDetail', { orderId: response.data.data._id }),
-                    },
-                    {
-                        text: 'Go Home',
-                        onPress: () => navigation.navigate('Home'),
-                    },
-                ]
-            );
+            navigation.replace('OrderSuccess');
+
         } catch (error: any) {
             Alert.alert('Error', error.response?.data?.message || 'Failed to place order');
-        } finally {
-            setLoading(false);
+            setLoading(false); // Only unset loading on error
         }
     };
 
@@ -134,6 +125,91 @@ const CheckoutScreen = () => {
         );
     }
 
+    if (loading) {
+        // Safe access to store details, fallback if cart is cleared
+        const firstItem = cart.length > 0 ? cart[0] : null;
+        const storeObj = firstItem?.medicine?.store;
+        const storeName = typeof storeObj === 'object' ? storeObj.name : 'Pharmacy';
+
+        // Mock address for store if not available
+        const storeAddress = "Processing Center";
+
+        return (
+            <View style={styles.placingOrderContainer}>
+
+                <View style={styles.placingLoaderContainer}>
+                    <ActivityIndicator size={120} color="#0066FF" />
+                </View>
+
+                <Text style={styles.placingOrderText}>Placing Order...</Text>
+
+                {/* Order Details Card */}
+                <View style={styles.placingCard}>
+                    <View style={styles.placingCardHeader}>
+                        <Ionicons name="receipt-outline" size={18} color="#9CA3AF" />
+                        <Text style={styles.placingCardTitle}>Order Details</Text>
+                    </View>
+                    <View style={styles.placingDivider} />
+
+                    <View style={styles.placingStoreRow}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.placingStoreName}>{storeName}</Text>
+                            <Text style={styles.placingStoreAddress}>{storeAddress}</Text>
+                            <Text style={styles.placingSummary}>{cart.length} Items • ₹{getTotalPrice().toFixed(2)}</Text>
+                        </View>
+                        {/* Mocking stacked images of items */}
+                        <View style={styles.placingImages}>
+                            <View style={styles.placingImagePlaceholder}><Text>💊</Text></View>
+                            {cart.length > 5 && <View style={styles.placingMoreBadge}><Text style={styles.placingMoreText}>+{cart.length - 5}</Text></View>}
+                        </View>
+                    </View>
+                </View>
+
+                {/* Delivery Address Card */}
+                {selectedAddress && (
+                    <View style={styles.placingCard}>
+                        <View style={styles.placingCardHeader}>
+                            <Ionicons name="location-outline" size={18} color="#9CA3AF" />
+                            <Text style={styles.placingCardTitle}>Delivery Address</Text>
+                        </View>
+                        <View style={styles.placingDivider} />
+
+                        <View style={styles.placingAddressRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.placingAddressText}>
+                                    {selectedAddress.addressLine1}
+                                </Text>
+                                <Text style={styles.placingAddressSubText}>
+                                    {selectedAddress.pincode}
+                                </Text>
+                            </View>
+                            <Ionicons name="checkmark-circle" size={24} color="#4ADE80" />
+                        </View>
+                    </View>
+                )}
+
+                {/* ETA Card */}
+                <View style={styles.placingCard}>
+                    <View style={styles.placingCardHeader}>
+                        <Ionicons name="time-outline" size={18} color="#9CA3AF" />
+                        <Text style={styles.placingCardTitle}>Estimated delivery time</Text>
+                    </View>
+                    <View style={styles.placingDivider} />
+
+                    <View>
+                        <Text style={styles.etaTime}>15-20 min</Text>
+                        <Text style={styles.etaDesc}>Preparing your order, your rider will pick it up once it's ready.</Text>
+                    </View>
+                </View>
+
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setLoading(false)}>
+                    <Text style={styles.cancelButtonText}>Cancel Order</Text>
+                </TouchableOpacity>
+
+            </View>
+        );
+    }
+
     return (
         <ScrollView style={styles.container}>
             {/* Delivery Address Section */}
@@ -141,7 +217,7 @@ const CheckoutScreen = () => {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Delivery Address</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+                        <TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Profile' } as any)}>
                             <Text style={styles.changeText}>Change</Text>
                         </TouchableOpacity>
                     </View>
@@ -420,6 +496,144 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#1F2937',
         fontWeight: '500',
+    },
+    placingOrderContainer: {
+        flex: 1,
+        backgroundColor: '#F3F4F6',
+        padding: 24,
+        alignItems: 'center',
+    },
+    placingLoaderContainer: {
+        marginTop: 60,
+        marginBottom: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    placingOrderText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        marginBottom: 32,
+        textAlign: 'center',
+    },
+    placingCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 12,
+        padding: 16,
+        width: '100%',
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    placingCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    placingCardTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    placingDivider: {
+        height: 1,
+        backgroundColor: '#F3F4F6',
+        marginBottom: 12,
+    },
+    placingStoreRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    placingStoreName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    placingStoreAddress: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        marginBottom: 4,
+    },
+    placingSummary: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    placingImages: {
+        flexDirection: 'row',
+        marginLeft: 12,
+    },
+    placingImagePlaceholder: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: -16, // overlap
+        borderWidth: 2,
+        borderColor: '#FFF',
+        zIndex: 1,
+    },
+    placingMoreBadge: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        backgroundColor: '#E5E7EB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFF',
+        zIndex: 0,
+    },
+    placingMoreText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#4B5563',
+    },
+    placingAddressRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    placingAddressText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    placingAddressSubText: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    etaTime: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    etaDesc: {
+        fontSize: 12,
+        color: '#6B7280',
+        lineHeight: 18,
+    },
+    cancelButton: {
+        marginTop: 16,
+        padding: 16,
+        width: '100%',
+        alignItems: 'center',
+        backgroundColor: '#E5E7EB',
+        borderRadius: 12,
+    },
+    cancelButtonText: {
+        color: '#4B5563',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 

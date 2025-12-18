@@ -1,101 +1,79 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
-import OTP from '../models/OTP';
-import { generateOTP, sendOTP } from '../utils/otp';
 import { AuthRequest } from '../middleware/auth';
 
-// Send OTP to mobile number
-export const sendOTPController = async (req: Request, res: Response): Promise<void> => {
+import { auth } from '../services/firebase';
+
+// Verify Firebase ID Token and login/register user
+export const verifyFirebaseTokenController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { mobileNumber } = req.body;
+        const { idToken } = req.body;
 
-        // Validate mobile number
-        if (!mobileNumber || !/^[0-9]{10}$/.test(mobileNumber)) {
+        if (!idToken) {
             res.status(400).json({
                 success: false,
-                message: 'Invalid mobile number. Must be 10 digits.'
+                message: 'ID Token is required'
             });
             return;
         }
 
-        // Generate OTP
-        const otp = generateOTP();
+        // 1. Verify ID Token with Firebase Admin
+        let phone_number;
 
-        // Save OTP to database
-        await OTP.create({
-            mobileNumber,
-            otp,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
-        });
-
-        // Send OTP via SMS
-        const sent = await sendOTP(mobileNumber, otp);
-
-        if (!sent) {
-            res.status(500).json({
-                success: false,
-                message: 'Failed to send OTP. Please try again.'
-            });
-            return;
+        // DEV BYPASS: Allow login without real Firebase Token if in Development
+        // This is crucial for Expo Go where reCAPTCHA is hard to setup
+        if (idToken === 'TEST-TOKEN-BYPASS' && (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV)) {
+            console.warn('⚠️  USING DEV BYPASS FOR LOGIN ⚠️');
+            // Expect mobileNumber to be passed in body for bypass
+            if (req.body.mobileNumber) {
+                // Mock the decoded token
+                phone_number = '+91' + req.body.mobileNumber; // Assume Indian code for bypass
+            } else {
+                res.status(400).json({
+                    success: false,
+                    message: 'Mobile number required for Dev Bypass'
+                });
+                return;
+            }
+        } else {
+            // REAL FIREBASE VERIFICATION
+            try {
+                const decodedToken = await auth.verifyIdToken(idToken);
+                phone_number = decodedToken.phone_number;
+            } catch (authError) {
+                console.error('Firebase Auth Verification Failed:', authError);
+                res.status(401).json({
+                    success: false,
+                    message: 'Invalid or expired ID Token'
+                });
+                return;
+            }
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'OTP sent successfully',
-            expiresIn: 600 // seconds
-        });
-    } catch (error) {
-        console.error('Error sending OTP:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error'
-        });
-    }
-};
-
-// Verify OTP and login/register user
-export const verifyOTPController = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { mobileNumber, otp } = req.body;
-
-        // Validate input
-        if (!mobileNumber || !otp) {
+        if (!phone_number) {
+            // Should not happen for Phone Auth, but possible for other providers if not configured
             res.status(400).json({
                 success: false,
-                message: 'Mobile number and OTP are required'
+                message: 'Phone number not found in Firebase Token'
             });
             return;
         }
 
-        // Find OTP record
-        const otpRecord = await OTP.findOne({
-            mobileNumber,
-            otp,
-            verified: false,
-            expiresAt: { $gt: new Date() }
-        }).sort({ createdAt: -1 });
+        // Remove country code if needed or normalize (e.g., +91888... -> 888...)
+        // Our DB stores 10 digits usually. 
+        // Firebase returns E.164 (+91XXXXXXXXXX)
+        const mobileNumber = phone_number.replace(/^\+91/, '').replace(/^\+/, ''); // specific to India or generic strip
 
-        if (!otpRecord) {
-            res.status(400).json({
-                success: false,
-                message: 'Invalid or expired OTP'
-            });
-            return;
-        }
-
-        // Mark OTP as verified
-        otpRecord.verified = true;
-        await otpRecord.save();
-
-        // Find or create user
+        // 2. Find or Create User in MongoDB
         let user = await User.findOne({ mobileNumber });
 
         if (!user) {
             user = await User.create({ mobileNumber });
+            console.log(`🆕 New User Created: ${mobileNumber}`);
         }
 
-        // Generate JWT tokens
+        // 3. Generate our own JWT Session Tokens (Same as before)
         const jwtSecret = process.env.JWT_SECRET || 'default-secret';
         const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
 
@@ -128,13 +106,23 @@ export const verifyOTPController = async (req: Request, res: Response): Promise<
                 refreshToken
             }
         });
+
     } catch (error) {
-        console.error('Error verifying OTP:', error);
+        console.error('Error verifying Firebase Token:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error'
         });
     }
+};
+
+// Deprecated: Send OTP logic is now Client-Side (Firebase SDK)
+// Keeping endpoint temporarily to prevent 404s if frontend calls it before update
+export const sendOTPController = async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json({
+        success: true,
+        message: 'Please use Firebase Client SDK to send OTP.'
+    });
 };
 
 // Refresh access token
@@ -233,3 +221,5 @@ export const updateLocationController = async (req: AuthRequest, res: Response):
         });
     }
 };
+
+// Flash Call Controller removed for Firebase Migration

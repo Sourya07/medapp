@@ -20,6 +20,19 @@ export interface IOrder extends Document {
     items: IOrderItem[];
     totalPrice: number;
     status: OrderStatus;
+    deliveryAddress: {
+        name: string;
+        fullName: string;
+        phoneNumber: string;
+        addressLine1: string;
+        addressLine2?: string;
+        landmark: string;
+        pincode: string;
+        location?: {
+            type: string;
+            coordinates: number[];
+        };
+    };
     notes?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -80,6 +93,19 @@ const OrderSchema: Schema = new Schema(
             type: String,
             enum: Object.values(OrderStatus),
             default: OrderStatus.PENDING
+        },
+        deliveryAddress: {
+            name: { type: String, required: true },
+            fullName: { type: String, required: true },
+            phoneNumber: { type: String, required: true },
+            addressLine1: { type: String, required: true },
+            addressLine2: { type: String },
+            landmark: { type: String, required: true },
+            pincode: { type: String, required: true },
+            location: {
+                type: { type: String, enum: ['Point'], default: 'Point' },
+                coordinates: { type: [Number] }
+            }
         },
         notes: {
             type: String
