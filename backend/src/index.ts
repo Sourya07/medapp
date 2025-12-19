@@ -81,6 +81,13 @@ const connectDB = async () => {
 
 // Start server
 const startServer = async () => {
+    // Debug Environment Variables
+    console.log('--- ENV DEBUG ---');
+    console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Set (Hidden)' : 'NOT SET');
+    console.log('PORT:', process.env.PORT);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('-----------------');
+
     await connectDB();
 
     app.listen(PORT, () => {
