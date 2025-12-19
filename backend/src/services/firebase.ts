@@ -13,8 +13,6 @@ try {
 
     let serviceAccount: any = null;
 
-    console.log(`[Firebase Init] Checking paths:\n - Root: ${serviceAccountPathRoot}\n - Src: ${serviceAccountPathSrc}\n - Cwd: ${serviceAccountPathCwd}`);
-
     if (fs.existsSync(serviceAccountPathRoot)) {
         console.log('🔥 Found service-account.json in root (relative)');
         serviceAccount = require(serviceAccountPathRoot);
