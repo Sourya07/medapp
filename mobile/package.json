@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -35,6 +36,8 @@
     "@babel/core": "^7.25.0",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "~12.0.8",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "typescript": "^5.3.3"
   },
   "private": true
