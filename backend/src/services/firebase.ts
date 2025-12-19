@@ -6,18 +6,24 @@ import fs from 'fs';
 let firebaseApp: admin.app.App;
 
 try {
-    // 1. Try to load from service-account.json in the root or src folder
+    // 1. Try to load from service-account.json in the root or src folder or CWD
     const serviceAccountPathRoot = path.join(__dirname, '../../service-account.json');
     const serviceAccountPathSrc = path.join(__dirname, '../service-account.json');
+    const serviceAccountPathCwd = path.join(process.cwd(), 'service-account.json');
 
     let serviceAccount: any = null;
 
+    console.log(`[Firebase Init] Checking paths:\n - Root: ${serviceAccountPathRoot}\n - Src: ${serviceAccountPathSrc}\n - Cwd: ${serviceAccountPathCwd}`);
+
     if (fs.existsSync(serviceAccountPathRoot)) {
-        console.log('🔥 Found service-account.json in root');
+        console.log('🔥 Found service-account.json in root (relative)');
         serviceAccount = require(serviceAccountPathRoot);
     } else if (fs.existsSync(serviceAccountPathSrc)) {
-        console.log('🔥 Found service-account.json in src');
+        console.log('🔥 Found service-account.json in src (relative)');
         serviceAccount = require(serviceAccountPathSrc);
+    } else if (fs.existsSync(serviceAccountPathCwd)) {
+        console.log('🔥 Found service-account.json in CWD');
+        serviceAccount = require(serviceAccountPathCwd);
     }
 
     if (serviceAccount) {

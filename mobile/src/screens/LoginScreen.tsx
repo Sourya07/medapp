@@ -218,6 +218,15 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 8,
     },
+    formContainer: {
+        width: '100%',
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
     input: {
         borderWidth: 1,
         borderColor: '#E5E7EB',
