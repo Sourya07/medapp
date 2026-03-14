@@ -1,8 +1,8 @@
-# Medical Store App 🏥
+# Medical Store App 
 
 A comprehensive mobile medical store application similar to 1mg/PharmEasy, built with React Native (Expo) and Node.js backend. Users can browse medicines from nearby stores, place orders, and track pickups.
 
-## 📱 Features
+## Features
 
 ### User Features
 - **OTP-based Authentication**: Secure mobile number login
@@ -18,7 +18,7 @@ A comprehensive mobile medical store application similar to 1mg/PharmEasy, built
 - Order status updates
 - Image uploads for medicines
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
 - Node.js + Express
