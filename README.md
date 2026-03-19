@@ -36,7 +36,7 @@ A comprehensive mobile medical store application similar to 1mg/PharmEasy, built
 - React Native Maps
 - Axios
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 medical/
